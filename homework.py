@@ -56,7 +56,6 @@ def get_api_answer(timestamp):
         response = requests.get(url=ENDPOINT,
                                 headers=HEADERS,
                                 params={'from_date': timestamp})
-        print(response.status_code)
         if response.status_code != HTTPStatus.OK:
             logger.critical('Возникла ошибка, endpoint недоступен')
             raise Status_Error('Endpoint не отвечает')
@@ -96,6 +95,7 @@ def parse_status(homework: dict):
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
+# flake8: noqa: C901
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
