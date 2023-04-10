@@ -1,4 +1,4 @@
-class Status_Error(Exception):
+class CamelCase(Exception):
     """Ошибка статуса в get_api_answer."""
     pass
 

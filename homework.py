@@ -9,7 +9,7 @@ import requests
 import telegram
 import telegram.ext
 from dotenv import load_dotenv
-from exceptions import ApiError, Status_Error
+from exceptions import ApiError, CamelCase
 
 load_dotenv()
 
@@ -56,13 +56,12 @@ def get_api_answer(timestamp):
         response = requests.get(url=ENDPOINT,
                                 headers=HEADERS,
                                 params={'from_date': timestamp})
-        if response.status_code != HTTPStatus.OK:
-            logger.critical('Возникла ошибка, endpoint недоступен')
-            raise Status_Error('Endpoint не отвечает')
-        else:
-            return response.json()
     except Exception as error:
         raise ApiError(f'Возникла ошибка при работе с API! {error}')
+    if response.status_code != HTTPStatus.OK:
+        logger.critical('Возникла ошибка, endpoint недоступен')
+        raise CamelCase('Endpoint не отвечает')
+    return response.json()
 
 
 def check_response(response):
@@ -71,67 +70,62 @@ def check_response(response):
         raise TypeError('Некорректный тип данных !')
     if 'homeworks' not in response:
         raise ResponseError('Homeworks отсутсвует !')
-    elif 'current_date' not in response:
+    if 'current_date' not in response:
         raise ResponseError('Ключ current_date отсутствует !')
-    elif not isinstance(response['homeworks'], list):
+    if not isinstance(response['homeworks'], list):
         raise TypeError('Некоректный тип данных!')
     return response.get('homeworks')
 
 
 def parse_status(homework: dict):
     """Поиск статуса Homework."""
-    status = homework.get('status')
-    if isinstance(status, dict):
+    if not isinstance(homework, dict):
         logger.critical('Формат данных не соответствует требуемому')
         raise ValueError('Некорректный формат данных')
-    homework_name = homework.get('homework_name')
-    if 'homework_name' not in homework or None:
+    status = homework.get('status')
+    if 'homework_name' not in homework:
         logger.critical('Отсутствуют данные')
-        raise KeyError(f'Отсутсвует необходимый ключ {homework_name}')
-    if status not in HOMEWORK_VERDICTS or None:
+        raise KeyError('Отсутсвует необходимый ключ homework_name')
+    homework_name = homework.get('homework_name')
+    if status not in HOMEWORK_VERDICTS:
         logger.error('Недокументированный статус домашней работы')
         raise Exception('Некорректный статус')
     verdict = HOMEWORK_VERDICTS.get(status)
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-# flake8: noqa: C901
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
         logger.critical('Возникла ошибка с токенами')
         sys.exit()
 
-    try:
-        bot = telegram.Bot(token=TELEGRAM_TOKEN)
-        send_message(bot, 'Practicum_bot активирован')
-    except Exception as error:
-        logger.critical('Telegram не отвечает')
-        raise Exception(f'Сбой в работе телеграмм {error}')
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    send_message(bot, 'Practicum_bot активирован')
 
     timestamp = int(time.time())
     last_status = ''
+    last_error = ''
     while True:
         try:
             responce = get_api_answer(timestamp)
             homework = check_response(responce)
             if homework:
                 status = parse_status(homework[0])
-                new_status = homework[0]['status']
+                new_status = homework[0]
                 if new_status != last_status:
                     send_message(bot, status)
                     last_status = new_status
                 else:
                     logger.debug('Нет обновлений')
-            if status == '' or None:
-                logger.critical('Неверный статус или пустой статус')
-                raise ValueError('Ошибка статуса')
         except telegram.TelegramError:
             logger.error(' Не удалость отправить сообщение!')
         except Exception as error:
             logger.error('Произошел сбой')
             message = f'Сбой в работе программы: {error}'
-            send_message(bot, message)
+            if error != last_error:
+                send_message(bot, message)
+                last_error = error
             return message
         finally:
             time.sleep(RETRY_PERIOD)
