@@ -9,7 +9,7 @@ import requests
 import telegram
 import telegram.ext
 from dotenv import load_dotenv
-from exceptions import ApiError, CamelCase
+from exceptions import ApiError, HTTPStatusError, WerdictStatusError
 
 load_dotenv()
 
@@ -60,7 +60,7 @@ def get_api_answer(timestamp):
         raise ApiError(f'Возникла ошибка при работе с API! {error}')
     if response.status_code != HTTPStatus.OK:
         logger.critical('Возникла ошибка, endpoint недоступен')
-        raise CamelCase('Endpoint не отвечает')
+        raise HTTPStatusError('Endpoint не отвечает')
     return response.json()
 
 
@@ -89,7 +89,7 @@ def parse_status(homework: dict):
     homework_name = homework.get('homework_name')
     if status not in HOMEWORK_VERDICTS:
         logger.error('Недокументированный статус домашней работы')
-        raise Exception('Некорректный статус')
+        raise WerdictStatusError('Некорректный статус')
     verdict = HOMEWORK_VERDICTS.get(status)
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -101,8 +101,6 @@ def main():
         sys.exit()
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    send_message(bot, 'Practicum_bot активирован')
-
     timestamp = int(time.time())
     last_status = ''
     last_error = ''
